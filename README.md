@@ -1,7 +1,29 @@
+<p align="center">
+  <img src="docs/readme-banner.png" alt="RootPilot" width="100%">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Kotlin-2.2.10-7F52FF" alt="Kotlin">
+  <img src="https://img.shields.io/badge/Compose-Material_3-4285F4" alt="Compose">
+  <img src="https://img.shields.io/badge/Room-2.8.4-3DDC84" alt="Room">
+  <img src="https://img.shields.io/badge/minSdk-29-3DDC84" alt="minSdk 29">
+  <img src="https://img.shields.io/badge/MCP-loopback-22D3EE" alt="MCP">
+</p>
+
 # RootPilot
 
 本地优先的 Android Root 控制台（课程作业项目）。一个 `MainActivity`，Compose + Material 3，
 四个底部标签（总览 / 应用 / 历史 / Agent），设置从顶栏进入。
+
+## 界面预览
+
+| 总览 | 应用 | 历史 |
+|---|---|---|
+| ![](docs/screenshots/dashboard.png) | ![](docs/screenshots/apps.png) | ![](docs/screenshots/history.png) |
+
+| Agent | 设置 | 导出 |
+|---|---|---|
+| ![](docs/screenshots/agent.png) | ![](docs/screenshots/settings.png) | ![](docs/screenshots/saf.png) |
 
 ## 状态
 
