@@ -178,6 +178,10 @@ bounds 内的触摸会被它消费。
 详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)、[`docs/API.md`](docs/API.md)、
 [`docs/DECISIONS.md`](docs/DECISIONS.md)。
 
+## License
+
+本项目基于 [MIT License](LICENSE) 发布。
+
 ## 贡献者
 
 <a href="https://github.com/yhzhang-dev"><img src="https://github.com/yhzhang-dev.png?size=96" width="56" height="56" alt="yhzhang-dev" title="yhzhang-dev"></a>
