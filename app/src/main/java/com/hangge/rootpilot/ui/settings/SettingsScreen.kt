@@ -1,5 +1,7 @@
 package com.hangge.rootpilot.ui.settings
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,6 +30,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hangge.rootpilot.AppContainer
 import com.hangge.rootpilot.domain.model.AppTheme
+import com.hangge.rootpilot.service.RootPilotAccessibilityService
 import com.hangge.rootpilot.ui.components.ConfirmDialog
 import com.hangge.rootpilot.ui.components.InlineMessage
 import com.hangge.rootpilot.ui.components.KeyValueRow
@@ -48,6 +51,8 @@ fun SettingsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showClearDialog by remember { mutableStateOf(false) }
     var showUnfreezeDialog by remember { mutableStateOf(false) }
+    var a11yTick by remember { mutableStateOf(0) }
+    val a11yConnected = remember(a11yTick) { RootPilotAccessibilityService.isConnected() }
 
     if (showClearDialog) {
         ConfirmDialog(
@@ -125,6 +130,39 @@ fun SettingsScreen(
                     checked = state.settings.agentControl,
                     onCheckedChange = viewModel::setAgentControl,
                 )
+            }
+        }
+
+        item {
+            SectionCard(
+                title = "无障碍桥",
+                subtitle = "读取节点树 · 按节点点击 · 数据不出设备",
+                trailing = {
+                    if (a11yConnected) StatusPill("已连接", PillTone.OK)
+                    else StatusPill("未启用", PillTone.NEUTRAL)
+                },
+            ) {
+                Text(
+                    text = "启用后 Agent 读一次界面只要几毫秒，并且能直接点节点，不再依赖 uiautomator dump。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                        },
+                    ) {
+                        Text(if (a11yConnected) "无障碍设置" else "去启用")
+                    }
+                    TextButton(onClick = { a11yTick += 1 }) { Text("刷新状态") }
+                }
             }
         }
 

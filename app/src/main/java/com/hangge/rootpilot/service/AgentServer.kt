@@ -42,6 +42,7 @@ import java.security.MessageDigest
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.view.accessibility.AccessibilityWindowInfo
 
 /**
  * Loopback-only HTTP API. One request per connection, JSON via org.json, no free-form shell.
@@ -185,19 +186,18 @@ class AgentServer(
             method == "GET" && path == "/v1/location/current" -> locationResult()
             method == "GET" && path == "/v1/screen/screenshot" -> screenshotResult()
             method == "GET" && path == "/v1/ui/tree" -> uiTreeResult()
+            method == "GET" && path == "/v1/ui/windows" -> windowsResult()
             method == "GET" && path == "/v1/files" -> filesResult(parseQuery(target))
             method == "GET" && path == "/v1/files/read" -> fileReadResult(parseQuery(target))
             method == "GET" && path == "/v1/notifications" -> notificationsResult()
             method == "GET" && path == "/v1/events" -> eventsResult(parseQuery(target))
             method == "GET" && path == "/v1/subscriptions" -> HttpResult(200, telemetry.status().toString())
             method == "GET" && path == "/v1/automation/observe" -> observationResult(parseQuery(target))
-            method == "GET" && path == "/v1/ui/foreground" -> HttpResult(
-                200,
-                JSONObject().put("packageName", deviceController.foregroundPackage() ?: JSONObject.NULL).toString(),
-            )
+            method == "GET" && path == "/v1/ui/foreground" -> foregroundResult()
             method == "GET" && path == "/v1/apps" -> HttpResult(200, appsJson(parseQuery(target)).toString())
             method == "GET" && path == "/v1/history" -> HttpResult(200, historyJson(parseQuery(target)).toString())
             method == "POST" && path == "/v1/ui/tap" -> handleUiTap(body)
+            method == "POST" && path == "/v1/ui/node/tap" -> handleUiNodeTap(body)
             method == "POST" && path == "/v1/ui/swipe" -> handleUiSwipe(body)
             method == "POST" && path == "/v1/ui/key" -> handleUiKey(body)
             method == "POST" && path == "/v1/ui/text" -> handleUiText(body)
@@ -208,12 +208,12 @@ class AgentServer(
             method == "POST" && path == "/v1/subscriptions/sensor/start" -> handleSensorSubscription(body, true)
             method == "POST" && path == "/v1/subscriptions/sensor/stop" -> handleSensorSubscription(body, false)
             method == "POST" && path == "/v1/automation/act" -> handleAutomationAct(body)
-            method == "POST" && path.startsWith("/v1/apps/") -> handleWriteAction(path)
+            method == "POST" && path.startsWith("/v1/apps/") -> handleWriteAction(path, parseQuery(target))
             else -> HttpResult(404, errorBody("未知路径：$path", "NOT_FOUND"))
         }
     }
 
-    private suspend fun handleWriteAction(path: String): HttpResult {
+    private suspend fun handleWriteAction(path: String, query: Map<String, String>): HttpResult {
         val segments = path.split('/').filter { it.isNotBlank() }
         // v1 / apps / {packageName} / {action}
         if (segments.size != 4 || segments[0] != "v1" || segments[1] != "apps") {
@@ -228,7 +228,9 @@ class AgentServer(
             if (!settings.current().agentControl) {
                 return HttpResult(403, errorBody("未开启 Agent 控制", "AGENT_CONTROL_OFF"))
             }
-            return actionResult(deviceController.launchApp(packageName))
+            return actionResult(
+                deviceController.launchApp(packageName, query["user"]?.toIntOrNull()),
+            )
         }
         if (actionName !in WRITE_ACTIONS) {
             return HttpResult(404, errorBody("未知操作：$actionName", "NOT_FOUND"))
@@ -271,6 +273,16 @@ class AgentServer(
             .put("requireToken", settings.current().requireToken)
             .put("permissions", permissions)
             .put(
+                "accessibility",
+                JSONObject()
+                    .put("connected", RootPilotAccessibilityService.isConnected())
+                    .put(
+                        "uiTreeSource",
+                        if (RootPilotAccessibilityService.isConnected()) "accessibility" else "uiautomator",
+                    )
+                    .put("canTapNode", RootPilotAccessibilityService.isConnected()),
+            )
+            .put(
                 "readTools",
                 JSONArray(
                     listOf(
@@ -286,7 +298,7 @@ class AgentServer(
                     listOf(
                         "launchApp", "freeze", "unfreeze", "forceStop", "tap", "swipe",
                         "keyEvent", "inputText", "fileWrite", "notificationDismiss",
-                        "locationSubscription", "sensorSubscription", "automationAct",
+                        "locationSubscription", "sensorSubscription", "automationAct", "tapNode",
                     ),
                 ),
             )
@@ -371,11 +383,87 @@ class AgentServer(
     }
 
     private suspend fun uiTreeResult(): HttpResult = try {
-        val xml = deviceController.dumpUiHierarchy()
-        HttpResult(200, JSONObject().put("format", "uiautomator-xml").put("xml", xml).toString())
+        val (xml, source) = dumpTree()
+        HttpResult(
+            200,
+            JSONObject().put("format", "uiautomator-xml").put("source", source).put("xml", xml).toString(),
+        )
     } catch (error: Exception) {
         HttpResult(409, errorBody(error.message ?: "UI 层级采集失败", "UI_TREE_FAILED"))
     }
+
+    /**
+     * Accessibility tree when the bridge is connected, otherwise the rooted uiautomator dump.
+     * The accessibility path returns in milliseconds and does not depend on an idle main thread,
+     * which is what made the combined observation slow.
+     */
+    private suspend fun dumpTree(): Pair<String, String> {
+        val fromAccessibility = deviceController.accessibilityTree()?.takeIf { it.length > 32 }
+        if (fromAccessibility != null) return fromAccessibility to "accessibility"
+        return deviceController.dumpUiHierarchy() to "uiautomator"
+    }
+
+    /** Foreground package plus its Android user, so a cloned app is distinguishable. */
+    private suspend fun foregroundResult(): HttpResult {
+        val info = deviceController.foregroundApp()
+        return HttpResult(
+            200,
+            JSONObject()
+                .put("packageName", info?.first ?: JSONObject.NULL)
+                .put("userId", info?.second ?: JSONObject.NULL)
+                .toString(),
+        )
+    }
+
+    /**
+     * Window geometry. The IME is a separate window that sits above the app and swallows touches
+     * in its band, which is why a coordinate tap near the bottom of a chat screen can do nothing.
+     *
+     * `userId` is only filled for the focused/active application window, taken from the resumed
+     * activity: a cloned app (分身) and its original share the package name and can both have
+     * windows alive at once, so attributing a window by package name alone would be ambiguous.
+     */
+    private suspend fun windowsResult(): HttpResult {
+        val foreground = runCatching { deviceController.foregroundApp() }.getOrNull()
+        val items = JSONArray()
+        deviceController.windowSnapshots().forEach { window ->
+            val attributedUser =
+                if (foreground != null &&
+                    window.packageName == foreground.first &&
+                    (window.focused || window.active)
+                ) {
+                    foreground.second
+                } else {
+                    null
+                }
+            items.put(windowJson(window, attributedUser))
+        }
+        return HttpResult(
+            200,
+            JSONObject()
+                .put("foregroundPackage", foreground?.first ?: JSONObject.NULL)
+                .put("foregroundUserId", foreground?.second ?: JSONObject.NULL)
+                .put("items", items)
+                .put("total", items.length())
+                .toString(),
+        )
+    }
+
+    private fun windowJson(window: WindowSnapshot, userId: Int? = null): JSONObject = JSONObject()
+        .put("type", window.type)
+        .put("typeName", window.typeName)
+        .put("packageName", window.packageName ?: JSONObject.NULL)
+        .put("userId", userId ?: JSONObject.NULL)
+        .put(
+            "boundsText",
+            "[${window.boundsLeft},${window.boundsTop}][${window.boundsRight},${window.boundsBottom}]",
+        )
+        .put("left", window.boundsLeft)
+        .put("top", window.boundsTop)
+        .put("right", window.boundsRight)
+        .put("bottom", window.boundsBottom)
+        .put("focused", window.focused)
+        .put("active", window.active)
 
     private fun filesResult(params: Map<String, String>): HttpResult = try {
         val path = params["path"].orEmpty()
@@ -521,6 +609,7 @@ class AgentServer(
         var screenshot: ByteArray? = null
         var screenshotMime = "image/png"
         var xml: String? = null
+        var uiSource = "uiautomator"
 
         if (flag("screenshot")) {
             val raw = runCatching { deviceController.captureScreen() }.getOrNull()
@@ -533,20 +622,31 @@ class AgentServer(
             }
         }
         if (flag("ui")) {
-            xml = runCatching { deviceController.dumpUiHierarchy() }.getOrNull()
+            val tree = runCatching { dumpTree() }.getOrNull()
+            xml = tree?.first
+            if (tree != null) uiSource = tree.second
             if (xml == null) warnings.put("ui hierarchy unavailable")
         }
 
+        val occluders = JSONArray()
+        runCatching {
+            deviceController.windowSnapshots()
+                .filter { it.type != AccessibilityWindowInfo.TYPE_APPLICATION }
+                .forEach { occluders.put(windowJson(it)) }
+        }
+
+        val foreground = runCatching { deviceController.foregroundApp() }.getOrNull()
+
         return JSONObject()
             .put("capturedAt", System.currentTimeMillis())
-            .put(
-                "foregroundPackage",
-                runCatching { deviceController.foregroundPackage() }.getOrNull() ?: JSONObject.NULL,
-            )
+            .put("foregroundPackage", foreground?.first ?: JSONObject.NULL)
+            .put("foregroundUserId", foreground?.second ?: JSONObject.NULL)
             .put("screenshotMimeType", screenshotMime)
             .put("screenshotBase64", screenshot?.let { Base64.encodeToString(it, Base64.NO_WRAP) } ?: JSONObject.NULL)
             .put("uiFormat", "uiautomator-xml")
             .put("uiXml", xml ?: JSONObject.NULL)
+            .put("uiSource", if (xml == null) JSONObject.NULL else uiSource)
+            .put("occluders", occluders)
             .put("warnings", warnings)
     }
 
@@ -582,7 +682,7 @@ class AgentServer(
         return parseBody(body) { json ->
             val action = json.optString("action")
             val result = when (action) {
-                "tap" -> deviceController.tap(json.requireInt("x"), json.requireInt("y"))
+                "tap" -> deviceController.tap(json.requireInt("x"), json.requireInt("y"), json.optInt("holdMs", 0))
                 "swipe" -> deviceController.swipe(
                     json.requireInt("x1"), json.requireInt("y1"),
                     json.requireInt("x2"), json.requireInt("y2"),
@@ -590,7 +690,13 @@ class AgentServer(
                 )
                 "key" -> deviceController.keyEvent(json.requireInt("keyCode"))
                 "text" -> deviceController.inputText(json.optString("text"))
-                "launch" -> deviceController.launchApp(json.optString("packageName"))
+                "launch" -> deviceController.launchApp(
+                    json.optString("packageName"),
+                    json.optInt("userId", -1).takeIf { it >= 0 },
+                )
+                "node" -> deviceController.tapNode(json.requireInt("nodeIndex"))
+                "clipboard" -> deviceController.setClipboard(json.optString("text"))
+                "paste" -> deviceController.paste()
                 else -> throw IllegalArgumentException("不支持的 action：$action")
             }
             if (!result.success) return@parseBody actionResult(result)
@@ -613,7 +719,20 @@ class AgentServer(
     }
 
     private suspend fun handleUiTap(body: String): HttpResult = parseBody(body) { json ->
-        actionResult(deviceController.tap(json.requireInt("x"), json.requireInt("y")))
+        actionResult(
+            deviceController.tap(
+                json.requireInt("x"),
+                json.requireInt("y"),
+                json.optInt("holdMs", 0),
+            ),
+        )
+    }
+
+    /** Node-addressed tap through the accessibility bridge: no root, no blind coordinates. */
+    private suspend fun handleUiNodeTap(body: String): HttpResult = parseBody(body) { json ->
+        val nodeIndex = json.optInt("nodeIndex", -1)
+        if (nodeIndex < 0) throw IllegalArgumentException("缺少 nodeIndex")
+        actionResult(deviceController.tapNode(nodeIndex))
     }
 
     private suspend fun handleUiSwipe(body: String): HttpResult = parseBody(body) { json ->

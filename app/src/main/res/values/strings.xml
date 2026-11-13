@@ -5,4 +5,6 @@
     <string name="agent_channel_description">本地回环 Agent 服务的常驻通知</string>
     <string name="agent_notification_title">RootPilot Agent 运行中</string>
     <string name="agent_notification_stop">停止</string>
+    <string name="accessibility_service_label">RootPilot 无障碍桥</string>
+    <string name="accessibility_service_description">供本机 Agent 读取当前界面的节点树，并按节点执行点击手势。数据不出设备，不读取输入内容，不联网。</string>
 </resources>

@@ -2,7 +2,7 @@ package com.hangge.rootpilot.domain.model
 
 enum class ActionType {
     SNAPSHOT, FREEZE, UNFREEZE, FORCE_STOP, BOOT,
-    LAUNCH, TAP, SWIPE, KEY_EVENT, TEXT_INPUT,
+    LAUNCH, TAP, SWIPE, KEY_EVENT, TEXT_INPUT, TAP_NODE, CLIPBOARD_SET, PASTE,
 }
 
 data class ActionRecord(

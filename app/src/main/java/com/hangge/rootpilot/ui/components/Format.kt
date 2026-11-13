@@ -42,6 +42,9 @@ fun actionLabel(action: ActionType): String = when (action) {
     ActionType.SWIPE -> "屏幕滑动"
     ActionType.KEY_EVENT -> "按键输入"
     ActionType.TEXT_INPUT -> "文本输入"
+    ActionType.TAP_NODE -> "节点点击"
+    ActionType.CLIPBOARD_SET -> "写剪贴板"
+    ActionType.PASTE -> "粘贴"
 }
 
 fun shortPackage(packageName: String, maxLength: Int = 34): String =

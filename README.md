@@ -38,6 +38,7 @@ v1 功能已实现并在 PHK110 上手工验收：
 - SafeMode / 允许 Agent 控制 / 主题 / 解冻全部 / 清空历史。
 - 通知监听、长轮询实时事件、连续定位/传感器订阅；
 - 截图 + UIAutomator 层级的观察接口，以及执行后自动再次观察的操作闭环；
+- 可选无障碍桥：毫秒级读取节点树、按 `node-index` 点击节点，无障碍未启用时自动退回 uiautomator；
 - 零依赖桌面 MCP Server，可让支持 MCP 的桌面 Agent 直接使用这些能力。
 - 总览页“课程主线演示”：一键串联 Room + SharedPreferences + 内部文件、ContentProvider、
   前台 Service、Socket 与回环 HTTP，并生成不含 Token 的本地验证报告。
@@ -128,6 +129,17 @@ Agent 的 MCP 配置即可。Server 通过标准输入/输出提供健康检查�
 
 健康检查是唯一免 Token 的接口。写接口需要 `Allow Agent Control` 打开，冻结/强制停止还要求
 `SafeMode` 关闭。
+
+### 无障碍桥（可选）
+
+`设置 → 无障碍 → RootPilot 无障碍桥` 打开即可（或 `adb shell settings put secure enabled_accessibility_services
+"com.hangge.rootpilot/com.hangge.rootpilot.service.RootPilotAccessibilityService"`）。作用：
+
+- `/v1/ui/tree`、`/v1/automation/observe` 改由无障碍服务提供，响应里 `source`/`uiSource` 为
+  `accessibility`；实测 0.4 s 出树（uiautomator 约 2.9 s），组合观察不再超时丢 UI；
+- 节点多一个 `node-index` 属性，可用 `POST /v1/ui/node/tap {"nodeIndex":17}` 或
+  `/v1/automation/act {"action":"node","nodeIndex":17}` 精确点击，不依赖坐标、不需要 Root；
+- 关闭服务后所有接口自动退回原来的 uiautomator + 坐标路径，不影响已有用法。
 
 ## 安全边界
 

@@ -51,6 +51,16 @@ sealed interface RootCommand {
         override val commandLine: String = "input tap $x $y"
     }
 
+    /**
+     * Explicit DOWN / UP pair. `input tap` fuses both edges into one injection; some views (notably
+     * chat send buttons) only react when they see a real press-hold-release sequence.
+     */
+    data class MotionEdge(val down: Boolean, val x: Int, val y: Int) : RootCommand {
+        init { require(x in 0..20_000 && y in 0..20_000) }
+        override val commandLine: String =
+            "input motionevent ${if (down) "DOWN" else "UP"} $x $y"
+    }
+
     data class Swipe(val x1: Int, val y1: Int, val x2: Int, val y2: Int, val durationMs: Int) : RootCommand {
         init {
             require(x1 in 0..20_000 && y1 in 0..20_000 && x2 in 0..20_000 && y2 in 0..20_000)
@@ -62,6 +72,14 @@ sealed interface RootCommand {
     data class KeyEvent(val keyCode: Int) : RootCommand {
         init { require(keyCode in 0..400) }
         override val commandLine: String = "input keyevent $keyCode"
+    }
+
+    /**
+     * Ctrl+V. Apps whose node tree is hidden (WeChat) still behave like a standard EditText for
+     * this shortcut, so a clipboard paste reaches the field without any key passing the IME.
+     */
+    data object Paste : RootCommand {
+        override val commandLine: String = "input keycombination 113 50"
     }
 
     data class InputText(val text: String) : RootCommand {
@@ -96,7 +114,34 @@ sealed interface RootCommand {
         override val commandLine: String = "am force-stop $packageName"
     }
 
+    /**
+     * Launch a package in a specific Android user. Vendor app-cloning (ColorOS "应用分身") runs the
+     * clone as the same package in a second user, so the package name alone cannot pick an instance.
+     *
+     * `monkey --user` wakes the clone's process but does not bring it to the front on ColorOS, so the
+     * launcher component is resolved first and started with an explicit `am start --user`.
+     */
+    data class ResolveLauncher(val packageName: String, val userId: Int) : RootCommand {
+        init {
+            PackageNames.requireValid(packageName)
+            require(userId in 0..999)
+        }
+
+        override val commandLine: String =
+            "cmd package resolve-activity --brief --user $userId $packageName | tail -1"
+    }
+
+    data class LaunchComponent(val component: String, val userId: Int) : RootCommand {
+        init {
+            require(COMPONENT.matches(component)) { "Component contains unsupported characters" }
+            require(userId in 0..999)
+        }
+
+        override val commandLine: String = "am start --user $userId -n $component"
+    }
+
     companion object {
         private val SAFE_TEXT = Regex("[A-Za-z0-9 ._@+,:/\\-]+")
+        private val COMPONENT = Regex("[A-Za-z][A-Za-z0-9_.]*/[A-Za-z0-9_.$]+")
     }
 }

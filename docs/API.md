@@ -24,21 +24,23 @@
 | GET | `/v1/sensors/sample?type=1` | 采集指定类型传感器的一次最新读数 |
 | GET | `/v1/location/current` | 最近一次系统定位、精度、来源和时间 |
 | GET | `/v1/screen/screenshot` | PNG 截图，JSON 中以 Base64 返回 |
-| GET | `/v1/ui/tree` | 当前界面的 UIAutomator XML 层级 |
+| GET | `/v1/ui/tree` | 当前界面的 UIAutomator XML 层级（无障碍可用时由其提供，响应带 `source`） |
+| GET | `/v1/ui/windows` | 窗口几何：类型、包名、bounds、焦点，以及 `foregroundUserId` 和聚焦窗口的 `userId`（用于区分主应用与分身） |
 | GET | `/v1/files?path=` | 查看 Agent 专用文件交换目录 |
 | GET | `/v1/files/read?path=` | 读取交换目录内文件，Base64 返回 |
 | GET | `/v1/notifications` | 当前活动通知（包名、标题、正文、时间、是否可清除） |
 | GET | `/v1/events?after=0&timeoutMs=25000` | 增量长轮询事件；最长等待 30 秒 |
 | GET | `/v1/subscriptions` | 连续定位和传感器订阅状态 |
 | GET | `/v1/automation/observe` | 一次返回前台包名、PNG 截图 Base64 与 UI XML |
-| GET | `/v1/ui/foreground` | 当前前台应用包名（需要 Root） |
+| GET | `/v1/ui/foreground` | 当前前台应用包名与 Android 用户（分身与主应用包名相同，靠 `userId` 区分） |
 | GET | `/v1/apps?query=&limit=50` | 应用列表（包名、名称、版本、targetSdk、系统/启用、权限名） |
 | GET | `/v1/history?limit=50` | 最近操作记录 |
 | POST | `/v1/apps/{pkg}/freeze` | 冻结（需要 Agent 控制 + SafeMode 关闭 + Root） |
 | POST | `/v1/apps/{pkg}/unfreeze` | 解冻（需要 Agent 控制 + Root；SafeMode 不拦截） |
 | POST | `/v1/apps/{pkg}/force-stop` | 强制停止（同冻结） |
-| POST | `/v1/apps/{pkg}/launch` | 启动应用（需要 Agent 控制） |
+| POST | `/v1/apps/{pkg}/launch` | 启动应用（需要 Agent 控制）；`?user=999` 可启动分身，缺省为 user 0 |
 | POST | `/v1/ui/tap` | 点击：`{"x":100,"y":200}` |
+| POST | `/v1/ui/node/tap` | 按节点点击：`{"nodeIndex":17}`（无障碍树里的 `node-index`，无需 Root） |
 | POST | `/v1/ui/swipe` | 滑动：`{"x1":100,"y1":800,"x2":100,"y2":200,"durationMs":300}` |
 | POST | `/v1/ui/key` | Android keycode：`{"keyCode":3}` |
 | POST | `/v1/ui/text` | 安全文本输入：`{"text":"hello world"}` |
@@ -52,7 +54,8 @@
 
 写接口返回 `{"ok":true,"packageName":"..."}` 或错误体。
 
-UI 自动化接口需要 Agent 控制开启、SafeMode 关闭和 Root。文本输入仅接受受控 ASCII 字符，拒绝
+UI 自动化接口需要 Agent 控制开启、SafeMode 关闭和 Root；`/v1/ui/node/tap` 走无障碍服务，不要求 Root，
+但同样受 Agent 控制与 SafeMode 约束。文本输入仅接受受控 ASCII 字符，拒绝
 Shell 元字符；所有自动化尝试都会写入操作审计。
 
 文件接口只能访问应用私有目录下的 `files/agent-exchange`，规范化路径后仍会校验父目录，拒绝
@@ -62,9 +65,10 @@ Shell 元字符；所有自动化尝试都会写入操作审计。
 传入；当前事件包括通知新增/移除、定位样本、传感器样本/错误和自动化动作。事件缓冲有界，断线
 重连后可读取近期事件，但它不是永久消息队列。
 
-`/v1/automation/act` 的 `action` 支持 `tap`、`swipe`、`key`、`text`、`launch`，参数与原有类型化
-端点一致。`observe` 默认 `true`，成功后等待 `settleMs`（0–3000 ms）并附加新的 observation，形成
-“观察 → 单步操作 → 再观察”闭环。
+`/v1/automation/act` 的 `action` 支持 `tap`、`swipe`、`key`、`text`、`launch`、`node`、`clipboard`、`paste`，
+参数与原有类型化
+端点一致（`node` 传 `nodeIndex`，`clipboard` 传 `text`）。`observe` 默认 `true`，成功后等待 `settleMs`（0–3000 ms）并附加新的
+observation，形成“观察 → 单步操作 → 再观察”闭环。
 
 ## 状态码
 
