@@ -15,6 +15,16 @@
 本地优先的 Android Root 控制台（课程作业项目）。一个 `MainActivity`，Compose + Material 3，
 四个底部标签（总览 / 应用 / 历史 / Agent），设置从顶栏进入。
 
+## 下载
+
+| 平台 | 版本 | 安装包 |
+| --- | --- | --- |
+| GitHub | [v1.0](https://github.com/yhzhang-dev/RootPilot/releases/tag/v1.0) | [app-debug.apk](https://github.com/yhzhang-dev/RootPilot/releases/download/v1.0/app-debug.apk) |
+| Gitee（国内镜像） | [v1.0](https://gitee.com/yhzhang-dev/root-pliot/releases/tag/v1.0) | [app-debug.apk](https://gitee.com/yhzhang-dev/root-pliot/releases/download/v1.0/app-debug.apk) |
+
+> 附件为 **debug 签名**的 APK，仅用于课程演示与本机自用；需要正式分发时请自行
+> `assembleRelease` 并配置签名。
+
 ## 界面预览
 
 | 总览 | 应用 | 历史 |
@@ -30,7 +40,7 @@
 v1 功能已实现并在 PHK110 上手工验收：
 
 - 总览（设备/Root/电池/内存存储/Agent/最近操作）、快照采集；
-- 应用列表（494 个应用，搜索/筛选）、详情、权限、冻结/解冻/强制停止；
+- 应用列表（近 500 个应用，搜索/筛选）、详情、权限、冻结/解冻/强制停止；
 - Room 审计（快照、操作、API 请求），History 分类查看、JSON/CSV 导出（SAF + 内部副本）；
 - 只读 ContentProvider + 应用内 Provider 自检；
 - 前台 Agent 服务、回环 HTTP API、Token 鉴权、应用内自检（200/200/401）；
@@ -59,6 +69,8 @@ PHK110 只做手工验收）。截图在 `docs/screenshots/`，验证记录见
 APK：`app/build/outputs/apk/debug/app-debug.apk`
 
 ## 安装
+
+从 [Releases](#下载) 下载 `app-debug.apk` 直接安装，或本地构建后：
 
 ```powershell
 adb install -r app\build\outputs\apk\debug\app-debug.apk
