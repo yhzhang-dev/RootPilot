@@ -43,7 +43,7 @@
 | POST | `/v1/ui/node/tap` | 按节点点击：`{"nodeIndex":17}`（无障碍树里的 `node-index`，无需 Root） |
 | POST | `/v1/ui/swipe` | 滑动：`{"x1":100,"y1":800,"x2":100,"y2":200,"durationMs":300}` |
 | POST | `/v1/ui/key` | Android keycode：`{"keyCode":3}` |
-| POST | `/v1/ui/text` | 安全文本输入：`{"text":"hello world"}` |
+| POST | `/v1/ui/text` | 写入文本：`{"text":"hello world"}`；优先无障碍 `ACTION_SET_TEXT`（任意 Unicode），失败回退 `input text`（仅 ASCII） |
 | POST | `/v1/files/write` | 写入交换目录：`{"path":"inbox/a.txt","base64":"..."}` |
 | POST | `/v1/notifications/dismiss` | 清除通知：`{"key":"通知 key"}` |
 | POST | `/v1/subscriptions/location/start` | 开始连续定位：`{"intervalMs":10000}` |
@@ -64,6 +64,18 @@ Shell 元字符；所有自动化尝试都会写入操作审计。
 `/v1/events` 是适合桌面 Agent 的 HTTP 长轮询流。客户端保存 `lastEventId`，下一次作为 `after`
 传入；当前事件包括通知新增/移除、定位样本、传感器样本/错误和自动化动作。事件缓冲有界，断线
 重连后可读取近期事件，但它不是永久消息队列。
+
+### 观察结果的字段
+
+`/v1/automation/observe` 除截图与 UI XML 外还返回：
+
+| 字段 | 含义 |
+| --- | --- |
+| `foregroundPackage` / `foregroundUserId` | 前台包名与所在 Android 用户（分身与主应用同包名） |
+| `uiSource` | `accessibility` 或 `uiautomator`，标明这棵树来自哪条路径 |
+| `occluders` | 非应用窗口（输入法、系统栏）的 bounds；落在其中的点击会被它们消费 |
+
+`/v1/ui/windows` 的每项还带 `userId`，但只对「聚焦且包名等于前台包名」的窗口填充，其余为 `null`。
 
 `/v1/automation/act` 的 `action` 支持 `tap`、`swipe`、`key`、`text`、`launch`、`node`、`clipboard`、`paste`，
 参数与原有类型化

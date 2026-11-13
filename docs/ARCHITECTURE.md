@@ -61,6 +61,23 @@ DAOH 暴露 `Flow<List<...>>`（最新在前）；导出时读取全量。Token 
 - 每个请求写一条 `api_requests`；日志里没有 Token、Header 或请求体。
 - 响应 `application/json; charset=utf-8`，错误体 `{"error","code"}`。
 
+## 无障碍桥与 UI 采集
+
+`RootPilotAccessibilityService` 是可选的第二条 UI 采集路径，与 rooted `uiautomator dump` 并存：
+
+- 输出**与 uiautomator 兼容的 XML**，额外带一个 `node-index`（先序序号），桌面端解析代码不用改。
+- 选窗口时只取 `TYPE_APPLICATION`，聚焦优先、面积次之；这解决了 `rootInActiveWindow`
+  返回状态栏或输入法窗口、以及部分应用返回**空根节点**（class 为空、bounds 全 0）的问题。
+- 点击节点用 `ACTION_CLICK`，失败时向上找可点击祖先，再失败才退化成按 bounds 中心的手势点击。
+- 文本写入用 `ACTION_SET_TEXT`，不合成按键，因此中文、emoji、空格都正确，也不需要 shell 转义。
+- 服务未启用时 `AgentServer.dumpTree()` 自动回退到 `RootCommand.DumpUiHierarchy`，接口契约不变。
+
+窗口几何由 `/v1/ui/windows` 暴露（类型、包名、bounds、焦点）。输入法是一个独立窗口，
+盖在应用之上并吞掉落在其带内的触摸；`observe` 的 `occluders` 字段让调用方在点击前就能发现。
+
+多开（ColorOS 应用分身）是**同包名的第二个 Android 用户**，窗口可以同时存在。因此窗口的
+`userId` 只在「聚焦且包名等于前台包名」时填充，其余为 `null`，不做猜测。
+
 ## 安全模型
 
 - `RootCommand` 是封闭的 sealed interface，只有固定模板；包名参数在构造时用

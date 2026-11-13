@@ -84,3 +84,43 @@ text/launch，不接受 Shell；动作成功后默认再次采集观察结果。
 API；截图作为 MCP image 返回，UI XML 作为 text 返回。它不在手机或桌面新增网络监听面，安全边界
 仍由 ADB 转发、API Token、Agent 控制开关、SafeMode 和类型化命令共同提供。
 
+## D16. 无障碍树优先、uiautomator 兜底
+
+`uiautomator dump` 在 PHK110 上约 2.9 秒，且与截图同请求时会超时丢数据。无障碍服务读同一棵树
+只要几十到几百毫秒。但微信等应用会屏蔽无障碍子树，直接改用无障碍会让这些应用彻底读不到。
+
+**决定：** 两条路径都保留，`/v1/ui/tree` 与观察接口优先用无障碍，返回 429 个字符以上的树才采用，
+否则回退 uiautomator；响应用 `source` / `uiSource` 标明实际来源。调用方不需要区分。
+
+## D17. 窗口几何单独成接口
+
+坐标点击失败的第一大原因是**输入法遮挡**：键盘是一个独立窗口，盖在应用之上，落在其带内的触摸
+被它消费。仅凭截图无法知道键盘是否弹起、弹到多高。
+
+**决定：** 增加 `/v1/ui/windows` 返回窗口类型、包名、bounds 与焦点，并在观察结果里附 `occluders`。
+点击前先确认目标点不在 `input-method` 的 bounds 内，而不是靠记忆里的固定坐标。
+
+## D18. 分身靠 userId 而不是包名
+
+ColorOS「应用分身」是同一个 APK 跑在第二个 Android 用户里，包名、Activity、界面完全相同；
+两个实例的窗口可以同时存在于 WindowManager。按包名归属窗口必然把主号和分身认成同一个人。
+
+**决定：** 前台用户来自 `topResumedActivity` 的 `u<id>`，可信且唯一；窗口的 `userId` 只在
+「聚焦且包名匹配前台」时填充，其余留 `null`。启动分身必须 `am start --user <id>`，
+`context.startActivity` 永远落在 user 0。
+
+## D19. 文本输入的三档降级
+
+`input text` 注入的是按键事件，会被输入法当成拼音组合：实测 `rootpilot 2050` 变成 `root'pilot`，
+空格丢失、连字符变减号。而无障碍的 `ACTION_SET_TEXT` 在屏蔽节点树的应用（微信）里没有目标节点。
+
+**决定：** 按能力降级——先 `ACTION_SET_TEXT`（任意 Unicode，不走输入法）；失败再 `input text`
+（仅 ASCII，且依赖输入法处于英文模式）；中文兜底走「写剪贴板 + 粘贴」。剪贴板写入必须让
+RootPilot 处于前台，Android 13+ 会静默丢弃后台应用的写操作。
+
+## D20. 长按用分离的 DOWN/UP 事件
+
+`input tap` 把按下与抬起合成一次注入，`input swipe x y x y <ms>` 在部分界面不足以触发长按判定
+（例如朋友圈的「发表文字」）。**决定：** `tap` 增加 `holdMs` 参数，大于 0 时改发
+`input motionevent DOWN` → 等待 → `UP` 两条独立事件。实测 1200 ms 稳定触发长按分支。
+

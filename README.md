@@ -39,6 +39,7 @@ v1 功能已实现并在 PHK110 上手工验收：
 - 通知监听、长轮询实时事件、连续定位/传感器订阅；
 - 截图 + UIAutomator 层级的观察接口，以及执行后自动再次观察的操作闭环；
 - 可选无障碍桥：毫秒级读取节点树、按 `node-index` 点击节点，无障碍未启用时自动退回 uiautomator；
+- 窗口几何与遮挡提示、前台/窗口 `userId`（区分主应用与分身）、按 Android 用户启动应用；
 - 零依赖桌面 MCP Server，可让支持 MCP 的桌面 Agent 直接使用这些能力。
 - 总览页“课程主线演示”：一键串联 Room + SharedPreferences + 内部文件、ContentProvider、
   前台 Service、Socket 与回环 HTTP，并生成不含 Token 的本地验证报告。
@@ -140,6 +141,20 @@ Agent 的 MCP 配置即可。Server 通过标准输入/输出提供健康检查�
 - 节点多一个 `node-index` 属性，可用 `POST /v1/ui/node/tap {"nodeIndex":17}` 或
   `/v1/automation/act {"action":"node","nodeIndex":17}` 精确点击，不依赖坐标、不需要 Root；
 - 关闭服务后所有接口自动退回原来的 uiautomator + 坐标路径，不影响已有用法。
+
+### 窗口、输入法与多开
+
+坐标点击失败的常见原因不是坐标算错，而是**目标被输入法窗口盖住**：键盘是独立窗口，落在其
+bounds 内的触摸会被它消费。
+
+- `GET /v1/ui/windows` 返回各窗口的类型、包名、bounds 与焦点；观察结果的 `occluders` 字段直接给出
+  遮挡窗口，点击前先确认目标点不在 `input-method` 内。
+- 输入条贴着键盘上沿：`y ≈ ime.top − 110`；键盘收起时贴屏幕底部 `y ≈ 高 − 113`。**不要记绝对值**，
+  不同输入法高度差 60 px 以上。
+- 文本输入按能力降级：`ACTION_SET_TEXT`（任意 Unicode）→ `input text`（仅 ASCII，且要求输入法
+  处于英文模式）→ `剪贴板 + 粘贴`（中文兜底；写剪贴板时 RootPilot 必须在前台）。
+- 多开（应用分身）是同包名的第二个 Android 用户：`/v1/ui/foreground` 返回 `userId`，
+  `POST /v1/apps/com.tencent.mm/launch?user=999` 可指定实例。`context.startActivity` 永远落在 user 0。
 
 ## 安全边界
 

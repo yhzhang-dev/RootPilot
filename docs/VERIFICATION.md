@@ -45,9 +45,30 @@ Root 命令模板、CSV 导出转义。
 | 独立截图 / UI 树 | 均为 200；PHK110 上分别约 0.6s / 2.6s |
 | 桌面 MCP 初始化 / tools/list / health tool | 通过；health 返回 API version 2 |
 
+### 无障碍桥与自动化（2026-11-13 晚追加）
+
+| 场景 | 结果 |
+| --- | --- |
+| 无障碍树 vs uiautomator | 桌面 111 节点：无障碍约 0.5s，uiautomator 约 2.9s |
+| 组合观察（截图 + UI） | 无障碍路径 0.9–2.2s；uiautomator 路径 16–25s 且 UI 半被丢弃 |
+| 节点点击（`node-index`） | 通过；点击桌面「设置」图标后前台变为设置/权限管理 |
+| 窗口几何 `/v1/ui/windows` | 通过；输入法窗口 `[0,1696][1240,2772]`，与截图一致 |
+| `occluders` | 通过；键盘弹起时出现在观察结果中 |
+| 分身识别 `foregroundUserId` | 通过；主号 0 / 分身 999，切换后窗口 `userId` 同步变化 |
+| 按用户启动应用 | 通过；`?user=0` 与 `?user=999` 分别拉起对应微信实例 |
+| `ACTION_SET_TEXT` | 通过；设置搜索框写入「你好 RootPilot 123」，中文与空格正确 |
+| 剪贴板 + 粘贴 | 通过；微信输入框粘贴 3 行中文并发送成功 |
+| 长按（`holdMs` / 同点 swipe） | 通过；朋友圈长按相机 1200ms 弹出「发表文字」页 |
+| 微信发送按钮 | 通过；`(1126, ime.top-110)` 点击成功，`y` 偏高 80px 时无响应 |
+
 ## 已知限制
 
-- 组合观察依赖 OEM 的 UIAutomator dump，PHK110 上可能超过 3 秒；桌面调用建议使用至少 15 秒超时。
+- 组合观察依赖 OEM 的 UIAutomator dump，PHK110 上可能超过 3 秒；启用无障碍桥后走毫秒级路径。
+- 微信屏蔽无障碍子树（主窗口 `childCount=0`），无障碍与 uiautomator 都只有 1 个节点，只能用截图 + 坐标。
+- 输入法是独立窗口，点击落在其 bounds 内会被吞；同一界面的输入条位置随键盘状态变化约 80–160px。
+- `input text` 受输入法影响：拼音输入法会把 ASCII 当拼音组合（`rootpilot 2050` → `root'pilot`）。
+  中文只能走「剪贴板 + 粘贴」，且写剪贴板时 RootPilot 必须在前台，否则 Android 13+ 静默丢弃。
+- 分身与主应用同包名，只能靠 `userId` 区分；`context.startActivity` 永远落在 user 0。
 - 系统应用在部分 ROM 上 `firstInstallTime` 为 1970 年代，界面显示“系统预装”。
 - OEM 会在安装后重放 `BOOT_COMPLETED`；接收器用 `SystemClock.elapsedRealtime()` 过滤 15 分钟以外的重放。
 - 端口修改后需重启 Agent 服务生效。
