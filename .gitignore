@@ -31,3 +31,6 @@ secrets.properties
 
 # Temporary working directory from document tooling
 .codex-docx-work/
+
+# Word temp/lock files
+~\$*
