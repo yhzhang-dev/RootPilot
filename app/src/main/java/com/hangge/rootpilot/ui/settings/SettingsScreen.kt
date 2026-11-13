@@ -223,6 +223,7 @@ fun SettingsScreen(
             SectionCard(title = "关于", subtitle = "本地优先 · 无云 · 无遥测") {
                 KeyValueRow("应用", "RootPilot")
                 KeyValueRow("版本", state.versionName)
+                KeyValueRow("主页", "yuhang.wiki")
                 KeyValueRow("包名", "com.hangge.rootpilot")
                 KeyValueRow("Agent 监听", "127.0.0.1 回环")
                 Spacer(modifier = Modifier.height(8.dp))
