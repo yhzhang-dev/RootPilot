@@ -1,6 +1,7 @@
 # Agent API
 
-基础地址：`http://127.0.0.1:8765`（仅回环）。桌面端先执行 `adb forward tcp:8765 tcp:8765`。
+基础地址：`http://127.0.0.1:8765`（默认仅回环）。桌面端可先执行 `adb forward tcp:8765 tcp:8765`，
+或在 Agent 页打开**允许局域网访问**后直接访问 `http://手机IP:8765`，两者都要求 Token。
 
 鉴权：除 `/v1/health` 外都需要请求头 `X-RootPilot-Token: <token>`，Token 在应用 Agent 页复制。
 所有响应为 JSON；错误体形状：

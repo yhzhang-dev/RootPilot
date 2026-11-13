@@ -74,9 +74,10 @@ ColorOS 在安装/更新后会向新包重放 `ACTION_BOOT_COMPLETED`，导致 H
 
 ## D14. 自动化采用观察—动作—观察闭环
 
-组合观察同时返回截图、UIAutomator XML 和前台包名。动作接口只接受已有的类型化 tap/swipe/key/
-text/launch，不接受 Shell；动作成功后默认再次采集观察结果。桌面 Agent 应优先从 UI XML bounds
-定位控件，用截图补充视觉语义，并在每个动作后验证结果，避免固定坐标脚本失控。
+组合观察同时返回截图、节点树与前台包名；节点树优先来自无障碍桥，未启用或目标应用屏蔽子树时
+回退 UIAutomator，并用 `source`/`uiSource` 标明来源。结果里还附 `occluders`（输入法、系统栏的
+边界）与 `foregroundUserId`（区分主应用与分身）。动作接口只接受已有的类型化 tap/swipe/key/
+text/launch/node/clipboard/paste，不接受 Shell；动作成功后默认再次采集观察结果。
 
 ## D15. MCP 是桌面适配层
 

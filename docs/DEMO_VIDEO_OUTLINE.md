@@ -54,7 +54,7 @@
 - [ ] 测试应用可冻结 / 解冻；
 - [ ] SafeMode / Allow Agent Control 状态符合流程；
 - [ ] Agent 服务已启动，Token 已复制；
-- [ ] `adb forward tcp:8765 tcp:8765` 已建立且 `/v1/health` 可访问；
+- [ ] `adb forward tcp:8765 tcp:8765` 已建立且 `/v1/health` 可访问（或已开「允许局域网访问」直连）；
 - [ ] 手机深色主题、通知栏无干扰；
 - [ ] 桌面终端字号放大、清屏。
 

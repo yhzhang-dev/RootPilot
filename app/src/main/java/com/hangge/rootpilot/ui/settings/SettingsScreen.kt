@@ -240,7 +240,7 @@ fun SettingsScreen(
                 Text(
                     text = "• 不提供任意 shell 命令，只有固定模板；\n" +
                         "• Provider 只读且不导出，外部集成走 HTTP API；\n" +
-                        "• 桌面端访问需 adb forward；\n" +
+                        "• 桌面端默认走回环，可在 Agent 页开启局域网访问；\n" +
                         "• 冻结桌面/输入法被保护规则阻止。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

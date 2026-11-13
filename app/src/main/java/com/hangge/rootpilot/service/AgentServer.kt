@@ -398,9 +398,24 @@ class AgentServer(
      * which is what made the combined observation slow.
      */
     private suspend fun dumpTree(): Pair<String, String> {
-        val fromAccessibility = deviceController.accessibilityTree()?.takeIf { it.length > 32 }
+        // A contentless "ghost" root (WeChat and a few hardened apps) still parses as XML but holds
+        // a single node, so the node count — not the string length — decides whether it is usable.
+        val fromAccessibility = deviceController.accessibilityTree()
+            ?.takeIf { tree -> tree.countNodes() >= MIN_ACCESSIBILITY_NODES }
         if (fromAccessibility != null) return fromAccessibility to "accessibility"
         return deviceController.dumpUiHierarchy() to "uiautomator"
+    }
+
+    private fun String.countNodes(): Int {
+        var index = 0
+        var count = 0
+        while (true) {
+            val at = indexOf("<node", index)
+            if (at < 0) break
+            count += 1
+            index = at + 5
+        }
+        return count
     }
 
     /** Foreground package plus its Android user, so a cloned app is distinguishable. */
@@ -968,6 +983,8 @@ class AgentServer(
         private const val HEADER_TOKEN = "x-rootpilot-token"
         private const val READ_TIMEOUT_MS = 5_000
         private const val MAX_BODY_BYTES = 6 * 1024 * 1024
+        /** Fewer nodes than this means the accessibility tree is a contentless ghost root. */
+        private const val MIN_ACCESSIBILITY_NODES = 2
         /** Longest side of a returned screenshot; keeps one observation small. */
         private const val SCREENSHOT_MAX_SIDE = 900
         private const val SCREENSHOT_QUALITY = 80
