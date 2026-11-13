@@ -152,7 +152,6 @@ class DeviceAgentController(
         return packageName to match.groupValues.getOrNull(1)?.toIntOrNull()
     }
 
-    suspend fun foregroundPackage(): String? = foregroundApp()?.first
 
     suspend fun captureScreen(): ByteArray {
         requireRootRead()

@@ -118,6 +118,7 @@ class RootPilotAccessibilityService : AccessibilityService() {
         return bounds.width().toLong() * bounds.height().toLong()
     }
 
+    @Suppress("DEPRECATION") // isChecked has no non-deprecated replacement on AccessibilityNodeInfo
     private fun appendNode(
         node: AccessibilityNodeInfo,
         out: StringBuilder,
@@ -289,12 +290,6 @@ class RootPilotAccessibilityService : AccessibilityService() {
             ?: findEditable(root, requireFocused = false, depth = 0)
             ?: return false
         return applyText(target, text)
-    }
-
-    /** Same as [setText] but for one specific node, e.g. a field that does not hold focus yet. */
-    fun setTextAt(nodeIndex: Int, text: String): Boolean {
-        val node = nodeAt(nodeIndex) ?: return false
-        return applyText(node, text)
     }
 
     private fun applyText(node: AccessibilityNodeInfo, text: String): Boolean {
