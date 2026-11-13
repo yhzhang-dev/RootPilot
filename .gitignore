@@ -1,0 +1,30 @@
+# Gradle / Android build output
+.gradle/
+build/
+app/build/
+/captures
+.externalNativeBuild/
+.cxx/
+.kotlin/
+*.apk
+*.aab
+*.hprof
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+
+# Machine-local configuration and signing secrets
+local.properties
+keystore.properties
+secrets.properties
+*.jks
+*.keystore
+
+# Scratch files produced by scripts/ (screenshots, UI dumps, downloads)
+/rootpilot-screen.png
+/rootpilot-ui.xml
+/phone.png
+/phone-ui.xml
+/downloaded-*.txt

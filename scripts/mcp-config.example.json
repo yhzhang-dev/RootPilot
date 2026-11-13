@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "rootpilot": {
+      "command": "py",
+      "args": ["-3", "E:\\RootPilot\\scripts\\rootpilot_mcp.py"],
+      "env": {
+        "ROOTPILOT_URL": "http://127.0.0.1:8765",
+        "ROOTPILOT_TOKEN": "PASTE_TOKEN_HERE"
+      }
+    }
+  }
+}

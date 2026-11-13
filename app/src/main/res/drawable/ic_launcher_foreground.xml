@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Terminal prompt mark: a rounded shell frame, a chevron, and a cursor bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M34,34 L74,34 A6,6 0 0 1 80,40 L80,68 A6,6 0 0 1 74,74 L34,74 A6,6 0 0 1 28,68 L28,40 A6,6 0 0 1 34,34 Z"
+        android:strokeColor="#E8A33D"
+        android:strokeWidth="4" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M40,46 L50,54 L40,62"
+        android:strokeColor="#4EC9B0"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="4" />
+    <path
+        android:fillColor="#4EC9B0"
+        android:pathData="M56,62 L68,62 A2,2 0 0 1 68,66 L56,66 A2,2 0 0 1 56,62 Z" />
+</vector>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RootPilot</string>
+    <string name="agent_channel_name">Agent 服务</string>
+    <string name="agent_channel_description">本地回环 Agent 服务的常驻通知</string>
+    <string name="agent_notification_title">RootPilot Agent 运行中</string>
+    <string name="agent_notification_stop">停止</string>
+</resources>
