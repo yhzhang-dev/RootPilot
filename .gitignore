@@ -28,3 +28,6 @@ secrets.properties
 /phone.png
 /phone-ui.xml
 /downloaded-*.txt
+
+# Temporary working directory from document tooling
+.codex-docx-work/
