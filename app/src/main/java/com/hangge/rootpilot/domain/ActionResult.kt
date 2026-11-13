@@ -26,6 +26,7 @@ enum class ActionErrorCode {
     INVALID_PACKAGE,
     SYSTEM_APP,
     NOT_FOUND,
+    CLIPBOARD_UNAVAILABLE,
     COMMAND_FAILED,
 }
 

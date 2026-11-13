@@ -98,18 +98,48 @@ class DeviceAgentController(
     /** Paste whatever is on the clipboard with Ctrl+V, bypassing the IME entirely. */
     suspend fun paste(): ActionResult = runRoot(ActionType.PASTE, RootCommand.Paste, "粘贴（Ctrl+V）")
 
-    /** Put text on the clipboard so a following [paste] can deliver it, Chinese included. */
+    /**
+     * Put text on the clipboard so a following [paste] can deliver it, Chinese included.
+     *
+     * Android 13+ only honours clipboard access for the focused app: a write issued while another
+     * app is in front is dropped without an error. That silent drop is why a paste can bring back
+     * the *previous* clip. So the foreground is checked first and the write is read back.
+     */
     suspend fun setClipboard(text: String): ActionResult {
         if (text.isEmpty() || text.length > MAX_TEXT_CHARS) {
             return failure(ActionType.CLIPBOARD_SET, "文本长度需在 1..$MAX_TEXT_CHARS")
         }
         if (!settings.current().agentControl) return failure(ActionType.CLIPBOARD_SET, "未开启 Agent 控制")
+
+        val foreground = foregroundApp()?.first
+        if (foreground != null && foreground != context.packageName) {
+            return failure(
+                ActionType.CLIPBOARD_SET,
+                "剪贴板只在 RootPilot 位于前台时才会生效（当前前台是 $foreground）。" +
+                    "先 launch ${context.packageName} 写入剪贴板，再切回目标应用粘贴",
+                code = ActionErrorCode.CLIPBOARD_UNAVAILABLE,
+            )
+        }
+
         return runCatching {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             clipboard.setPrimaryClip(ClipData.newPlainText("RootPilot", text))
-            success(ActionType.CLIPBOARD_SET, "已写入剪贴板（${text.length} 字符）")
+            val readBack = runCatching { clipboard.primaryClip?.getItemAt(0)?.text?.toString() }.getOrNull()
+            if (readBack == text) {
+                success(ActionType.CLIPBOARD_SET, "已写入剪贴板（${text.length} 字符，已校验）")
+            } else {
+                failure(
+                    ActionType.CLIPBOARD_SET,
+                    "剪贴板写入未生效（读回 ${readBack?.take(20) ?: "null"}），系统只在应用位于前台时接受写入",
+                    code = ActionErrorCode.CLIPBOARD_UNAVAILABLE,
+                )
+            }
         }.getOrElse { error ->
-            failure(ActionType.CLIPBOARD_SET, "剪贴板写入失败：${error.message ?: "unknown"}")
+            failure(
+                ActionType.CLIPBOARD_SET,
+                "剪贴板写入失败：${error.message ?: "unknown"}",
+                code = ActionErrorCode.CLIPBOARD_UNAVAILABLE,
+            )
         }
     }
 
@@ -190,9 +220,14 @@ class DeviceAgentController(
         return ActionResult.ok(packageName.orEmpty(), message)
     }
 
-    private suspend fun failure(type: ActionType, message: String, packageName: String? = null): ActionResult {
+    private suspend fun failure(
+        type: ActionType,
+        message: String,
+        packageName: String? = null,
+        code: ActionErrorCode? = null,
+    ): ActionResult {
         record(type, false, message, packageName)
-        val code = when {
+        val resolved = code ?: when {
             message.contains("SafeMode") -> ActionErrorCode.SAFE_MODE
             message.contains("Agent 控制") -> ActionErrorCode.AGENT_CONTROL_OFF
             message.contains("Root") -> ActionErrorCode.ROOT_UNAVAILABLE
@@ -200,7 +235,7 @@ class DeviceAgentController(
             message.contains("不存在") -> ActionErrorCode.NOT_FOUND
             else -> ActionErrorCode.COMMAND_FAILED
         }
-        return ActionResult.failure(code, message, packageName)
+        return ActionResult.failure(resolved, message, packageName)
     }
 
     private suspend fun record(type: ActionType, success: Boolean, message: String, packageName: String?) {

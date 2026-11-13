@@ -10,7 +10,11 @@
 ```
 
 `code` 取值：`ROOT_UNAVAILABLE`、`SAFE_MODE`、`AGENT_CONTROL_OFF`、`INVALID_PACKAGE`、
-`SYSTEM_APP`、`NOT_FOUND`、`COMMAND_FAILED`；另有鉴权专用的 `UNAUTHORIZED`（HTTP 401）。
+`SYSTEM_APP`、`NOT_FOUND`、`CLIPBOARD_UNAVAILABLE`、`COMMAND_FAILED`；另有鉴权专用的
+`UNAUTHORIZED`（HTTP 401）。
+
+`CLIPBOARD_UNAVAILABLE`（409）表示剪贴板写入不会被系统接受：Android 只允许**前台应用**写剪贴板，
+后台写入会被静默丢弃，所以接口先查前台再写，写完再读回校验，两者任一不成立就返回该错误。
 
 ## 端点
 

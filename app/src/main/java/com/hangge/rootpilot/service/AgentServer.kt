@@ -878,7 +878,7 @@ class AgentServer(
         ActionErrorCode.INVALID_PACKAGE -> 400
         ActionErrorCode.NOT_FOUND -> 404
         ActionErrorCode.SYSTEM_APP, ActionErrorCode.SAFE_MODE, ActionErrorCode.AGENT_CONTROL_OFF -> 403
-        ActionErrorCode.ROOT_UNAVAILABLE -> 409
+        ActionErrorCode.ROOT_UNAVAILABLE, ActionErrorCode.CLIPBOARD_UNAVAILABLE -> 409
         ActionErrorCode.COMMAND_FAILED, null -> 500
     }
 
