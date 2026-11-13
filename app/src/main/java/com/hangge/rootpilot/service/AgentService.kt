@@ -46,6 +46,19 @@ class AgentService : Service() {
             stopServerAndSelf()
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_RESTART) {
+            // Rebind after a settings change (lanAccess / requireToken / port). Enter the
+            // foreground first so the startForegroundService() contract is met promptly,
+            // then swap the listening socket.
+            val port = container.settingsStore.current().agentPort
+            startInForeground(buildNotification(port, "正在重启…"))
+            starting = false
+            scope.launch {
+                container.agentServer.stop()
+                startServer(port)
+            }
+            return START_STICKY
+        }
         val port = container.settingsStore.current().agentPort
         startInForeground(buildNotification(port, "正在启动…"))
         startServer(port)
@@ -142,6 +155,7 @@ class AgentService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.hangge.rootpilot.action.STOP_AGENT"
+        const val ACTION_RESTART = "com.hangge.rootpilot.action.RESTART_AGENT"
         private const val CHANNEL_ID = "rootpilot_agent"
         private const val NOTIFICATION_ID = 8765
         private const val TAG = "AgentService"
@@ -150,6 +164,14 @@ class AgentService : Service() {
             ContextCompat.startForegroundService(
                 context,
                 Intent(context, AgentService::class.java),
+            )
+        }
+
+        /** Re-read settings and rebind the server (used when lanAccess or requireToken changes). */
+        fun restart(context: Context) {
+            ContextCompat.startForegroundService(
+                context,
+                Intent(context, AgentService::class.java).setAction(ACTION_RESTART),
             )
         }
 

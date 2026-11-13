@@ -144,7 +144,11 @@ fun AgentScreen(
         item {
             SectionCard(
                 title = "Agent 服务",
-                subtitle = "前台服务，仅监听 127.0.0.1",
+                subtitle = if (state.settings.lanAccess) {
+                    "前台服务，局域网可访问"
+                } else {
+                    "前台服务，仅监听 127.0.0.1"
+                },
                 trailing = {
                     StatusPill(
                         text = if (state.running) "运行中" else "未启动",
@@ -158,7 +162,10 @@ fun AgentScreen(
                     checked = state.running,
                     onCheckedChange = { enabled -> if (enabled) requestStart() else viewModel.stopService() },
                 )
-                KeyValueRow("监听地址", "127.0.0.1:${state.settings.agentPort}")
+                KeyValueRow(
+                    "监听地址",
+                    (if (state.settings.lanAccess) "0.0.0.0" else "127.0.0.1") + ":${state.settings.agentPort}",
+                )
                 if (state.running && state.boundPort != 0) {
                     KeyValueRow("实际端口", state.boundPort.toString())
                 }
@@ -183,8 +190,24 @@ fun AgentScreen(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
+                ToggleRow(
+                    title = "允许局域网访问",
+                    subtitle = "开启后服务绑定 0.0.0.0，同一 Wi-Fi 的电脑无需 adb 即可直连",
+                    checked = state.settings.lanAccess,
+                    onCheckedChange = viewModel::setLanAccess,
+                )
+                ToggleRow(
+                    title = "Token 校验",
+                    subtitle = "关闭后局域网内任何人都能调用；仅建议在自家网络关闭",
+                    checked = state.settings.requireToken,
+                    onCheckedChange = viewModel::setRequireToken,
+                )
                 Text(
-                    text = "桌面 Agent 通过 adb forward tcp:8765 tcp:8765 访问；服务不会绑定公网地址。",
+                    text = if (state.settings.lanAccess) {
+                        "桌面 Agent 直接访问 http://手机IP:${state.settings.agentPort}（状态接口会返回手机当前 IP）。"
+                    } else {
+                        "桌面 Agent 通过 adb forward tcp:${state.settings.agentPort} tcp:${state.settings.agentPort} 访问回环地址。"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -140,6 +140,37 @@ class AgentViewModel(
         }
     }
 
+    /** Opt-in LAN binding; the server must rebind, so restart the service when it is running. */
+    fun setLanAccess(enabled: Boolean) {
+        settingsStore.setLanAccess(enabled)
+        restartIfRunning()
+        _state.update {
+            it.copy(
+                message = if (enabled) {
+                    "已允许局域网访问：同一 Wi-Fi 的电脑可直接连接 http://手机IP:${settingsStore.current().agentPort}"
+                } else {
+                    "已恢复仅回环访问（127.0.0.1）"
+                },
+            )
+        }
+    }
+
+    /** Token check on/off. Off is only meant for a trusted private network. */
+    fun setRequireToken(enabled: Boolean) {
+        settingsStore.setRequireToken(enabled)
+        restartIfRunning()
+        _state.update {
+            it.copy(message = if (enabled) "已启用 Token 校验" else "已关闭 Token 校验：局域网内任何人都能调用这个接口")
+        }
+    }
+
+    private fun restartIfRunning() {
+        if (agentServer.running.value) {
+            runCatching { AgentService.restart(application) }
+                .onFailure { error -> _state.update { it.copy(error = "重启服务失败：${error.message}") } }
+        }
+    }
+
     fun regenerateToken() {
         viewModelScope.launch {
             val masked = withContext(Dispatchers.IO) {
@@ -205,7 +236,11 @@ class AgentViewModel(
                         jsonBody = "{}",
                     ),
                     probe("自动化观察（带 Token）", "/v1/automation/observe", token = token),
-                    probe("状态（无 Token，应 401）", "/v1/status", token = null),
+                    probe(
+                        if (settingsStore.current().requireToken) "状态（无 Token，应 401）" else "状态（无 Token，校验已关）",
+                        "/v1/status",
+                        token = null,
+                    ),
                 )
             }
             _state.update {

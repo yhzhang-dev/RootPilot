@@ -67,7 +67,9 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 ## Agent API
 
 1. 应用内 Agent 页启动服务（前台服务 + 常驻通知）。
-2. 服务只绑定 `127.0.0.1`，默认端口 8765，Token 通过 `X-RootPilot-Token` 头传递。
+2. 默认只绑定 `127.0.0.1`，默认端口 8765，Token 通过 `X-RootPilot-Token` 头传递。Agent 页的
+   **允许局域网访问** 开关会让服务改绑 `0.0.0.0`，同一 Wi-Fi 的电脑可直连，无需 `adb forward`；
+   **Token 校验** 开关可关闭校验（仅建议自家网络）。`/v1/status` 会返回当前 `lanIp` 与 `port`。
 3. 桌面访问：
 
 ```powershell

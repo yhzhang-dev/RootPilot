@@ -8,7 +8,7 @@ RootPilot is a local-first Android device gateway for personal desktop Agents an
 - Use Kotlin, Jetpack Compose, Material 3, one `MainActivity`, and bottom-tab navigation.
 - Root is optional at runtime: every screen opens without root; privileged actions render disabled with a visible reason.
 - `RootShell` accepts only the typed commands listed in the brief. No free-form shell command reaches `su`.
-- The Agent server binds `127.0.0.1` only, requires a token, and keeps write endpoints off by default. `SafeMode` is on by default.
+- The Agent server binds `127.0.0.1` by default, requires a token by default, and keeps write endpoints off by default. `SafeMode` is on by default. Two opt-in settings relax that for an owner-controlled private LAN: `允许局域网访问` binds `0.0.0.0` so a desktop can connect without an adb forward, and `Token 校验` can be turned off. Both default to the secure choice and are shown in the Agent tab.
 - Local-first product: no analytics or crash reporting. Device data may be exposed to the owner's desktop Agent through loopback + ADB forwarding. Outbound calls require an explicit feature and visible setting.
 - Use an emulator for instrumented tests. Never run `connectedDebugAndroidTest` on PHK110.
 - Keep `E:\Companion` unchanged. RootPilot may add opt-in sensors, location, notification access, screen capture, accessibility/UI automation, file exchange, network diagnostics and other device-Agent capabilities. Do not add WeChat-specific or cloud-model code.

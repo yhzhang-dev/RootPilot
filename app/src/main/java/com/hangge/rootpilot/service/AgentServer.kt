@@ -79,9 +79,11 @@ class AgentServer(
     suspend fun start(port: Int): Result<Unit> = withContext(Dispatchers.IO) {
         if (serverSocket != null) return@withContext Result.success(Unit)
         runCatching {
+            // Loopback unless the owner opted into LAN access (AppSettings.lanAccess).
+            val host = if (settings.current().lanAccess) ANY_ADDRESS else LOOPBACK
             val socket = ServerSocket().apply {
                 reuseAddress = true
-                bind(InetSocketAddress(InetAddress.getByName(LOOPBACK), port))
+                bind(InetSocketAddress(InetAddress.getByName(host), port))
             }
             serverSocket = socket
             _boundPort.value = socket.localPort
@@ -259,10 +261,12 @@ class AgentServer(
         deviceInfo.permissionStates().forEach { (name, granted) -> permissions.put(name, granted) }
         return JSONObject()
             .put("apiVersion", 2)
-            .put("transport", "loopback-adb-forward")
+            .put("transport", if (settings.current().lanAccess) "lan-http" else "loopback-adb-forward")
             .put("root", rootShell.isRootAvailable())
             .put("agentControl", settings.current().agentControl)
             .put("safeMode", settings.current().safeMode)
+            .put("lanAccess", settings.current().lanAccess)
+            .put("requireToken", settings.current().requireToken)
             .put("permissions", permissions)
             .put(
                 "readTools",
@@ -599,7 +603,20 @@ class AgentServer(
             .put("storageFreeBytes", latest?.storageFreeBytes ?: 0L)
             .put("appCount", profile.appCount)
             .put("capturedAt", latest?.capturedAt ?: 0L)
+            .put("port", if (_boundPort.value != 0) _boundPort.value else settings.current().agentPort)
+            .put("lanAccess", settings.current().lanAccess)
+            .put("requireToken", settings.current().requireToken)
+            .put("lanIp", lanIp() ?: JSONObject.NULL)
     }
+
+    /** Wi-Fi IPv4 first, then any other non-loopback IPv4, so a desktop can find the phone. */
+    private fun lanIp(): String? = runCatching {
+        val entries = deviceInfo.network().addresses
+        fun ipv4Of(entry: String): String? =
+            entry.substringAfter(':', "").takeIf { it.isNotBlank() && !it.startsWith("127.") && !it.contains(':') }
+        entries.firstNotNullOfOrNull { entry -> ipv4Of(entry)?.takeIf { entry.startsWith("wlan") } }
+            ?: entries.firstNotNullOfOrNull { entry -> ipv4Of(entry) }
+    }.getOrNull()
 
     private suspend fun appsJson(params: Map<String, String>): JSONObject {
         val query = params["query"].orEmpty()
@@ -645,6 +662,8 @@ class AgentServer(
     }
 
     private fun isAuthorized(headers: Map<String, String>): Boolean {
+        // Token checking is opt-out for a trusted private LAN (AppSettings.requireToken).
+        if (!settings.current().requireToken) return true
         val provided = headers[HEADER_TOKEN] ?: return false
         val expected = tokenStore.token()
         return MessageDigest.isEqual(
@@ -757,6 +776,7 @@ class AgentServer(
 
     companion object {
         private const val LOOPBACK = "127.0.0.1"
+        private const val ANY_ADDRESS = "0.0.0.0"
         private const val HEADER_TOKEN = "x-rootpilot-token"
         private const val READ_TIMEOUT_MS = 5_000
         private const val MAX_BODY_BYTES = 6 * 1024 * 1024
