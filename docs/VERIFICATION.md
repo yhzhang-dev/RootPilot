@@ -70,5 +70,10 @@ Root 命令模板、CSV 导出转义。
   中文只能走「剪贴板 + 粘贴」，且写剪贴板时 RootPilot 必须在前台，否则 Android 13+ 静默丢弃。
 - 分身与主应用同包名，只能靠 `userId` 区分；`context.startActivity` 永远落在 user 0。
 - 系统应用在部分 ROM 上 `firstInstallTime` 为 1970 年代，界面显示“系统预装”。
+- **无线调试与 VPN 冲突**：手机侧 Clash/Mihomo 的 TUN 会让配对页报出 `172.19.0.1`（TUN 网关）
+  而不是局域网地址，并按管会导致监听端口关闭。实测同一个 31.8 MB APK：VPN 开着时装机中途
+  `device offline`、端口失效；关掉后 2.7 秒装完，10 MB 随机数据 push 约 28.9 MB/s。无线调试每次
+  重启端口都会变，`adb devices` 显示 `offline` 时应先用 `adb mdns services` 找新端口。
+- 应用内网络能力（截图、点击、启动、状态）不依赖 adb；只有安装 APK、`am start` 等调试操作需要。
 - OEM 会在安装后重放 `BOOT_COMPLETED`；接收器用 `SystemClock.elapsedRealtime()` 过滤 15 分钟以外的重放。
 - 端口修改后需重启 Agent 服务生效。
