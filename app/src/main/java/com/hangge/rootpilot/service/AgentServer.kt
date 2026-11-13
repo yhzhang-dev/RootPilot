@@ -39,6 +39,8 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URLDecoder
 import java.security.MessageDigest
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Base64
 
 /**
@@ -188,7 +190,7 @@ class AgentServer(
             method == "GET" && path == "/v1/notifications" -> notificationsResult()
             method == "GET" && path == "/v1/events" -> eventsResult(parseQuery(target))
             method == "GET" && path == "/v1/subscriptions" -> HttpResult(200, telemetry.status().toString())
-            method == "GET" && path == "/v1/automation/observe" -> observationResult()
+            method == "GET" && path == "/v1/automation/observe" -> observationResult(parseQuery(target))
             method == "GET" && path == "/v1/ui/foreground" -> HttpResult(
                 200,
                 JSONObject().put("packageName", deviceController.foregroundPackage() ?: JSONObject.NULL).toString(),
@@ -498,22 +500,81 @@ class AgentServer(
         }
     }
 
-    private suspend fun observationResult(): HttpResult = try {
-        HttpResult(200, observationJson().toString())
+    private suspend fun observationResult(params: Map<String, String>): HttpResult = try {
+        HttpResult(200, observationJson(params).toString())
     } catch (error: Exception) {
         HttpResult(409, errorBody(error.message ?: "观察失败", "OBSERVATION_FAILED"))
     }
 
-    private suspend fun observationJson(): JSONObject {
-        val screenshot = deviceController.captureScreen()
-        val xml = deviceController.dumpUiHierarchy()
+    /**
+     * One observation. `screenshot=0` or `ui=0` skips the expensive half (a caller that only needs
+     * control bounds should ask for `ui` alone); each half is time-boxed so a wedged `uiautomator`
+     * can never hang the whole request, and a failed half comes back as a warning instead.
+     */
+    private suspend fun observationJson(params: Map<String, String> = emptyMap()): JSONObject {
+        fun flag(name: String): Boolean = when (params[name]?.lowercase()) {
+            null, "", "1", "true", "yes" -> true
+            else -> false
+        }
+
+        val warnings = JSONArray()
+        var screenshot: ByteArray? = null
+        var screenshotMime = "image/png"
+        var xml: String? = null
+
+        if (flag("screenshot")) {
+            val raw = runCatching { deviceController.captureScreen() }.getOrNull()
+            if (raw == null) {
+                warnings.put("screenshot unavailable")
+            } else {
+                val encoded = encodeScreenshot(raw)
+                screenshot = encoded.first
+                screenshotMime = encoded.second
+            }
+        }
+        if (flag("ui")) {
+            xml = runCatching { deviceController.dumpUiHierarchy() }.getOrNull()
+            if (xml == null) warnings.put("ui hierarchy unavailable")
+        }
+
         return JSONObject()
             .put("capturedAt", System.currentTimeMillis())
-            .put("foregroundPackage", deviceController.foregroundPackage() ?: JSONObject.NULL)
-            .put("screenshotMimeType", "image/png")
-            .put("screenshotBase64", Base64.encodeToString(screenshot, Base64.NO_WRAP))
+            .put(
+                "foregroundPackage",
+                runCatching { deviceController.foregroundPackage() }.getOrNull() ?: JSONObject.NULL,
+            )
+            .put("screenshotMimeType", screenshotMime)
+            .put("screenshotBase64", screenshot?.let { Base64.encodeToString(it, Base64.NO_WRAP) } ?: JSONObject.NULL)
             .put("uiFormat", "uiautomator-xml")
-            .put("uiXml", xml)
+            .put("uiXml", xml ?: JSONObject.NULL)
+            .put("warnings", warnings)
+    }
+
+    /**
+     * A full-resolution PNG is ~1.5 MB (base64 ~2 MB), which does not fit in the window a
+     * frozen app is given before the OEM freezer suspends it again. Downscaling to a JPEG keeps
+     * one observation at a few hundred KB without losing the information an agent needs.
+     */
+    private fun encodeScreenshot(png: ByteArray): Pair<ByteArray, String> {
+        val bitmap = runCatching { BitmapFactory.decodeByteArray(png, 0, png.size) }.getOrNull()
+            ?: return png to "image/png"
+        return runCatching {
+            val scale = minOf(1f, SCREENSHOT_MAX_SIDE.toFloat() / maxOf(bitmap.width, bitmap.height).toFloat())
+            val scaled = if (scale < 0.99f) {
+                Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * scale).toInt().coerceAtLeast(1),
+                    (bitmap.height * scale).toInt().coerceAtLeast(1),
+                    true,
+                )
+            } else {
+                bitmap
+            }
+            val out = ByteArrayOutputStream()
+            scaled.compress(Bitmap.CompressFormat.JPEG, SCREENSHOT_QUALITY, out)
+            if (scaled !== bitmap) scaled.recycle()
+            out.toByteArray() to "image/jpeg"
+        }.getOrElse { png to "image/png" }.also { bitmap.recycle() }
     }
 
     private suspend fun handleAutomationAct(body: String): HttpResult {
@@ -537,7 +598,15 @@ class AgentServer(
             val response = JSONObject().put("ok", true).put("message", result.message)
             if (json.optBoolean("observe", true)) {
                 delay(json.optLong("settleMs", 350).coerceIn(0, 3_000))
-                response.put("observation", observationJson())
+                response.put(
+                    "observation",
+                    observationJson(
+                        mapOf(
+                            "screenshot" to json.optBoolean("screenshot", true).toString(),
+                            "ui" to json.optBoolean("ui", true).toString(),
+                        ),
+                    ),
+                )
             }
             HttpResult(200, response.toString())
         }
@@ -780,6 +849,9 @@ class AgentServer(
         private const val HEADER_TOKEN = "x-rootpilot-token"
         private const val READ_TIMEOUT_MS = 5_000
         private const val MAX_BODY_BYTES = 6 * 1024 * 1024
+        /** Longest side of a returned screenshot; keeps one observation small. */
+        private const val SCREENSHOT_MAX_SIDE = 900
+        private const val SCREENSHOT_QUALITY = 80
         private const val MAX_LINE_BYTES = 8 * 1024
         private const val MAX_HEADERS = 64
         private val WRITE_ACTIONS = mapOf(
