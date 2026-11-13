@@ -136,3 +136,9 @@ Agent 的 MCP 配置即可。Server 通过标准输入/输出提供健康检查�
 
 详见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)、[`docs/API.md`](docs/API.md)、
 [`docs/DECISIONS.md`](docs/DECISIONS.md)。
+
+## 贡献者
+
+<a href="https://github.com/yhzhang-dev"><img src="https://github.com/yhzhang-dev.png?size=96" width="56" height="56" alt="yhzhang-dev" title="yhzhang-dev"></a>
+&nbsp;&nbsp;
+<a href="https://github.com/deepsea-whale"><img src="https://github.com/deepsea-whale.png?size=96" width="56" height="56" alt="deepsea-whale" title="deepsea-whale"></a>
